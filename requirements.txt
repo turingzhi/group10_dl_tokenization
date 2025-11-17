@@ -138,8 +138,8 @@ terminado==0.18.1
 tinycss2==1.4.0
 tokenizers==0.22.1
 tomli==2.3.0
-torch==2.0.0
-torchaudio==2.7.1+cu118
+torch==2.9.0
+torchaudio==2.9.0
 torchvision==0.15.1
 tornado==6.5.2
 tqdm==4.67.1

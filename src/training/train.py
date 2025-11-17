@@ -72,10 +72,7 @@ def train_model(tokenizer_name: str, model_type: str):
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch}: train_loss={avg_loss:.4f}")
 
-
         os.makedirs("checkpoints", exist_ok=True)
-
-
         # (optional) save checkpoint
         out_path = f"checkpoints/{tokenizer_name}_{model_type}_epoch{epoch}.pt"
         torch.save(model.state_dict(), out_path)
