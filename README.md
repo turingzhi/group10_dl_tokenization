@@ -93,6 +93,11 @@ Evaluate the results:
 python -m src.evaluation.eval_model <tokenizer> <model_type> <checkpoint_path>
 ```
 
+Example:
+
+```bash
+python -m src.evaluation.eval_model bpe transformer checkpoints/bpe_transformer_epoch4.pt
+```
 
 
 The results look like:
