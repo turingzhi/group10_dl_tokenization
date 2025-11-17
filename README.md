@@ -19,6 +19,7 @@ cd group10_dl_tokenization
 Init the environment:
 
 ```bash
+conda create -n token python=3.10
 conda activate token
 pip install -r requirements.txt
 ```
