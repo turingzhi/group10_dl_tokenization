@@ -25,7 +25,7 @@ def train_model(tokenizer_name: str, model_type: str):
     print("Loaded Wiki2:", len(train_ds), "train,", len(val_ds), "val", (test_ds), "test")
 
     print("Building tokenized datasets and dataloaders...")
-    train_loader, val_loader, test_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
+    train_loader, val_loader= make_dataloaders(train_ds, val_ds, tokenizer, config)
     print("Dataloaders ready. Starting epochs...")
     # train_ds, val_ds = load_tinystories()
     # train_loader, val_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
