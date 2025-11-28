@@ -9,6 +9,11 @@ class UnigramTokenizer:
         self.tokenizer = tokenizer
         self.vocab_size = tokenizer.get_vocab_size()
 
+        self.pad_id = self.tokenizer.token_to_id("<pad>")
+        self.unk_id = self.tokenizer.token_to_id("<unk>")
+        self.bos_id = self.tokenizer.token_to_id("<bos>")
+        self.eos_id = self.tokenizer.token_to_id("<eos>")
+
     @classmethod
     def train(cls, corpus_path, vocab_size=5000, save_dir="data/tokenizers/unigram"):
         save_dir = Path(save_dir)
@@ -20,9 +25,11 @@ class UnigramTokenizer:
         trainer = trainers.UnigramTrainer(
             vocab_size=vocab_size,
             special_tokens=SPECIAL_TOKENS,
+            unk_token="<unk>",
         )
 
         tokenizer.train(files=[corpus_path], trainer=trainer)
+
         tokenizer.save(str(save_dir / "tokenizer.json"))
         return cls(tokenizer)
 
