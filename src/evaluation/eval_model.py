@@ -21,6 +21,7 @@ def build_model(tokenizer, model_type):
             n_heads=config["num_heads"],
             n_layers=config["num_layers"],
             context_length=config["context_length"],
+            dropout=config["dropout"],
         )
     elif model_type == "lstm":
         model = LSTMLM(vocab_size, config["model_dim"])
