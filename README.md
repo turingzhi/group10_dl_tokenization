@@ -1,9 +1,9 @@
-# Tokenization Strategies for Tiny Language Models  
+# Exploring Tokenization Strategies for Large Language Models  
 
 **02456 Deep Learning – Group 10 (DTU)**
 
 This repository investigates how different tokenization strategies affect the training and performance of small-scale language models.  
-We compare **Word**, **BPE**, **Unigram**, and **Byte-level** tokenizers on the **TinyStories** dataset, using both **Transformer** and **LSTM** models.
+We compare **Word**, **BPE**, **Unigram**, and **Byte-level** tokenizers on the **WikiText2** dataset, using both **Transformer** and **LSTM** models.
 
 ---
 
@@ -75,26 +75,36 @@ Example: checkpoints/word_transformer_epoch4.pt
 
 
 
-Evaluate the results:
+Evaluate the results validation set:
 
 
 ```bash
-python -m src.evaluation.eval_model word transformer checkpoints/word_transformer_epoch4.pt
-python -m src.evaluation.eval_model bpe transformer checkpoints/bpe_transformer_epoch4.pt
-python -m src.evaluation.eval_model unigram transformer checkpoints/unigram_transformer_epoch4.pt
-python -m src.evaluation.eval_model byte transformer checkpoints/byte_transformer_epoch4.pt
-
-python -m src.evaluation.eval_model word lstm checkpoints/word_lstm_epoch4.pt
-python -m src.evaluation.eval_model bpe lstm checkpoints/bpe_lstm_epoch4.pt
-python -m src.evaluation.eval_model unigram lstm checkpoints/unigram_lstm_epoch4.pt
-python -m src.evaluation.eval_model byte lstm checkpoints/byte_lstm_epoch4.pt
+python -m src.evaluation.eval_model word transformer checkpoints/word_transformer_epoch4.pt val
+python -m src.evaluation.eval_model bpe transformer checkpoints/bpe_transformer_epoch4.pt val
+python -m src.evaluation.eval_model unigram transformer checkpoints/unigram_transformer_epoch4.pt val
+python -m src.evaluation.eval_model byte transformer checkpoints/byte_transformer_epoch4.pt val
+ 
+python -m src.evaluation.eval_model word lstm checkpoints/word_lstm_epoch4.pt val
+python -m src.evaluation.eval_model bpe lstm checkpoints/bpe_lstm_epoch4.pt val
+python -m src.evaluation.eval_model unigram lstm checkpoints/unigram_lstm_epoch4.pt val
+python -m src.evaluation.eval_model byte lstm checkpoints/byte_lstm_epoch4.pt val
 ```
 
+Evaluate the results testset:
 
-The results look like:
 
-nll/token = 0.0457
-perplexity = 1.0468
+```bash
+python -m src.evaluation.eval_model word transformer checkpoints/word_transformer_epoch4.pt test
+python -m src.evaluation.eval_model bpe transformer checkpoints/bpe_transformer_epoch4.pt test
+python -m src.evaluation.eval_model unigram transformer checkpoints/unigram_transformer_epoch4.pt test
+python -m src.evaluation.eval_model byte transformer checkpoints/byte_transformer_epoch4.pt test
+ 
+python -m src.evaluation.eval_model word lstm checkpoints/word_lstm_epoch4.pt test
+python -m src.evaluation.eval_model bpe lstm checkpoints/bpe_lstm_epoch4.pt test
+python -m src.evaluation.eval_model unigram lstm checkpoints/unigram_lstm_epoch4.pt test
+python -m src.evaluation.eval_model byte lstm checkpoints/byte_lstm_epoch4.pt test
+```
+
 
 
 
