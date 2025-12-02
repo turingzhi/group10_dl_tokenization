@@ -6,6 +6,8 @@ import torch.nn.functional as F
 from torch.optim import AdamW
 from tqdm import tqdm
 import math
+import json
+
 
 from src.config import config
 from src.data.load_tinystories import load_tinystories
@@ -15,18 +17,42 @@ from src.tokenization.factory import get_tokenizer
 from src.models.transformer_lm import TransformerLM
 from src.models.lstm_lm import LSTMLM
 
-def get_lr(step, warmup_steps, total_steps):
-        if step < warmup_steps:
-            return config["learning_rate"] * (step + 1) / warmup_steps
+# def get_lr(step, warmup_steps, total_steps):
+#         if step < warmup_steps:
+#             return config["learning_rate"] * (step + 1) / warmup_steps
         
+#         progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+#         progress = min(1.0, progress)
+#         return config["learning_rate"] * 0.5 * (1.0 + math.cos(math.pi * progress))
+
+import math
+
+def get_lr(step, warmup_steps, total_steps):
+    # Retrieve base and minimum LR from config
+    base_lr = config["learning_rate"]
+    min_lr = config.get("min_lr", 1e-7) # Use a default min_lr if not provided
+
+    if step < warmup_steps:
+        # Warmup Phase: Linear increase to base_lr
+        current_lr = base_lr * (step + 1) / warmup_steps
+    else:
+        # Cosine Decay Phase: Decays from base_lr down to zero (or min_lr)
         progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
-        return config["learning_rate"] * 0.5 * (1.0 + math.cos(math.pi * progress))
+        progress = min(1.0, progress)
+        
+        # Original Cosine formula decays to 0 at progress=1.0
+        # Formula: LR = LR_min + 0.5 * (LR_max - LR_min) * (1 + cos(pi * progress))
+        # Here, LR_min is min_lr, and LR_max is base_lr.
+        current_lr = min_lr + 0.5 * (base_lr - min_lr) * (1.0 + math.cos(math.pi * progress))
+
+    return current_lr
+
 
 def train_model(tokenizer_name: str, model_type: str):
     print(f"Starting training with tokenizer='{tokenizer_name}', model_type='{model_type}'")
     device = config["device"]
 
-    # 1) tokenizer and data
+    # 1) tokenizer and dataset
     tokenizer = get_tokenizer(tokenizer_name)
     pad_id = tokenizer.pad_id
     print(f"pad:{pad_id}")
@@ -70,10 +96,15 @@ def train_model(tokenizer_name: str, model_type: str):
     model = model.to(device)
     optimizer = AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=0.01)
 
-    # 3) training loop
+    # results folder
+    os.makedirs("results", exist_ok=True)
+    results = []
+
     global_step = 0
+
+    # 3) training loop
     for epoch in range(config["num_epochs"]):
-        print(f"Epoch {epoch} starting...")
+        print(f"\n===== Epoch {epoch} =====")
         model.train()
         total_loss = 0.0
 
@@ -174,11 +205,9 @@ def train_model(tokenizer_name: str, model_type: str):
 
 
         os.makedirs("checkpoints", exist_ok=True)
-        # (optional) save checkpoint
-        out_path = f"checkpoints/{tokenizer_name}_{model_type}_epoch{epoch}.pt"
-        torch.save(model.state_dict(), out_path)
-        print(f"Saved checkpoint to {out_path}")
-
+        ckpt_path = f"checkpoints/{tokenizer_name}_{model_type}_epoch{epoch}.pt"
+        torch.save(model.state_dict(), ckpt_path)
+        print(f"Saved checkpoint to {ckpt_path}")
 
 
 

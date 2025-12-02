@@ -8,6 +8,7 @@ checkpoints/
 
 # Tokenizers data
 data/tokenizers/
+data/
 
 # Environment files
 .env
