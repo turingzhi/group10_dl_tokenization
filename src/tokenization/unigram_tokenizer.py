@@ -67,7 +67,7 @@ class UnigramTokenizer:
         )
 
 
-        tokenizer.save(str(save_dir / "tokenizer.json"))
+        tokenizer.save(str(save_dir / "vocab.json"))
         return cls(tokenizer)
 
     # 4. FIX: Simplify encode/decode to use the configured pipeline
@@ -85,7 +85,7 @@ class UnigramTokenizer:
         """
         Loads the saved tokenizer from a file.
         """
-        tokenizer_path = Path(save_dir) / "tokenizer.json"
+        tokenizer_path = Path(save_dir) / "vocab.json"
         if not tokenizer_path.exists():
             raise FileNotFoundError(f"Tokenizer file not found at {tokenizer_path}")
             

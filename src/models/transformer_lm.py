@@ -55,7 +55,7 @@ class TransformerLM(nn.Module):
         # 2. Embeddings Summation (Token + Position)
         # Standard practice: apply dropout *after* summation of embeddings
         h = self.token_emb(x) + self.pos_emb(pos)
-        # h = self.drop(h) # Apply dropout once
+        h = self.drop(h) # Apply dropout once
 
         # 3. Prepare Causal Mask
         # If the input sequence is smaller than the pre-registered mask, slice it.
@@ -150,13 +150,14 @@ def verify_transformer_lm():
     assert diag_check and off_diag_check, "❌ Causal Mask Pattern is Incorrect."
     
 
-    # ----------------------------------------------------
+# ----------------------------------------------------
     ## CHECK C: Loss Sanity Check (Overfitting a single batch)
     # ----------------------------------------------------
     print("\n[VERIFY C] Loss Sanity Check (Overfit Single Batch):")
     
     # Use the single dummy batch for training
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+    # NOTE: Set ignore_index to a dummy padding token ID if you were using padding.
     criterion = nn.CrossEntropyLoss()
     
     initial_loss = None
@@ -167,28 +168,43 @@ def verify_transformer_lm():
         
         logits = model(dummy_input)
         
-        # Reshape for CrossEntropyLoss
-        # Logits: [B*T, V], Target: [B*T]
+        # -------------------------------------------------------------------
+        ## CRITICAL FIX: Implement Label Shifting for Autoregressive Training
+        # -------------------------------------------------------------------
+        
+        # 1. Target (Label) Shift: Cut off the first token (x_0 is never predicted)
+        # Target is [B, T-1]
+        targets = dummy_target[:, 1:].contiguous() 
+        
+        # 2. Logits Trim: Cut off the last logit (logit_T never has a target)
+        # Logits is [B, T-1, V]
         V = logits.size(-1)
-        loss = criterion(logits.view(-1, V), dummy_target.view(-1))
+        logits_trimmed = logits[:, :-1, :].contiguous()
+        
+        # 3. Compute Loss
+        # Logits: [B*(T-1), V], Target: [B*(T-1)]
+        loss = criterion(logits_trimmed.view(-1, V), targets.view(-1))
+        
+        # -------------------------------------------------------------------
         
         if epoch == 0:
             initial_loss = loss.item()
         
+        # ... (Backward/Step/Print logic remains the same) ...
         loss.backward()
         optimizer.step()
         
         if epoch % 5 == 0 or epoch == 19:
             ppl = torch.exp(loss).item()
-            print(f"  Epoch {epoch:02d}: Loss={loss.item():.4f}, PPL={ppl:.2f}")
+            print(f"  Epoch {epoch:02d}: Loss={loss.item():.4f}, PPL={ppl:.2f}")
     
+    # ... (Final print and assertion logic remains the same) ...
     final_loss = loss.item()
     
-    print(f"  Initial Loss: {initial_loss:.4f}")
-    print(f"  Final Loss:   {final_loss:.4f}")
+    print(f"  Initial Loss: {initial_loss:.4f}")
+    print(f"  Final Loss:   {final_loss:.4f}")
 
     # Expect the loss to drop dramatically (e.g., by 95%)
-    # This value is arbitrary, but loss MUST drop significantly.
     expected_reduction = 0.95
     
     if final_loss < initial_loss * (1 - expected_reduction):
@@ -198,11 +214,5 @@ def verify_transformer_lm():
         
     print("\n--- Verification Complete ---")
 
-# Execute the verification
 if __name__ == '__main__':
-    verify_transformer_lm()
-# Note on Genericity:
-# This model is generic because it only takes the vocab_size and context_length 
-# (max_seq_len) from the overall configuration. As long as any tokenizer 
-# (Word, BPE, Byte, Unigram) provides valid token IDs (0 to vocab_size-1), 
-# the model will work correctly.
+    verify_transformer_lm() 

@@ -70,8 +70,8 @@ class BPETokenizer:
         )
 
         # 6. Save and return
-        tokenizer.save(str(save_dir / "tokenizer.json"))
-        print(f"Tokenizer saved to {save_dir / 'tokenizer.json'}")
+        tokenizer.save(str(save_dir / "vocab.json"))
+        print(f"Tokenizer saved to {save_dir / 'vocab.json'}")
 
         return cls(tokenizer)
 
@@ -80,7 +80,7 @@ class BPETokenizer:
         """
         Loads the saved tokenizer from a file.
         """
-        tokenizer_path = Path(save_dir) / "tokenizer.json"
+        tokenizer_path = Path(save_dir) / "vocab.json"
         if not tokenizer_path.exists():
             raise FileNotFoundError(f"Tokenizer file not found at {tokenizer_path}")
             

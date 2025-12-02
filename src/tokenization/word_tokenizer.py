@@ -20,7 +20,7 @@ class WordTokenizer:
     @staticmethod
     def tokenize_text(text: str) -> List[str]:
         """Split text into tokens using simple alphanumeric segmentation."""
-        return re.findall(r"[A-Za-z0-9]+", text.lower())
+        return re.findall(r"[\w']+|[.,!?;:]", text.lower())
 
     @classmethod
     def train(cls, corpus_path: str, vocab_size: int = 5000, save_dir: str = "data/tokenizers/word"):
@@ -39,10 +39,23 @@ class WordTokenizer:
                 if tokens:
                     counter.update(tokens)
 
+        # max_words = vocab_size - len(SPECIAL_TOKENS)
+
+        # # deterministic ordering
+        # sorted_words = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
+        # most_common = [w for w, _ in sorted_words[:max_words]]
+        # 1. Apply the minimum frequency cutoff (f >= 2)
+        # Any word with a count of 1 is filtered out.
+        filtered_words = {word: count for word, count in counter.items() if count >= 2}
+
+        # 2. Re-calculate the number of words to select
         max_words = vocab_size - len(SPECIAL_TOKENS)
 
-        # deterministic ordering
-        sorted_words = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
+        # 3. Deterministic ordering: sort by count (desc) then by word (asc)
+        # Now sorting the filtered list instead of the original counter
+        sorted_words = sorted(filtered_words.items(), key=lambda x: (-x[1], x[0]))
+        
+        # 4. Select the most common words based on the available space
         most_common = [w for w, _ in sorted_words[:max_words]]
 
         itos = SPECIAL_TOKENS + most_common

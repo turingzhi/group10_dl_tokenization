@@ -1,7 +1,7 @@
 from datasets import load_dataset
 from pathlib import Path
 
-def build_corpus(out_path="data/tokenizers/corpus.txt", split="train"):
+def build_corpus(out_path="data/corpus.txt", split="train"):
     #ds = load_dataset("roneneldan/TinyStories", split=split)
     ds = load_dataset("wikitext", "wikitext-2-raw-v1", split=split)
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
