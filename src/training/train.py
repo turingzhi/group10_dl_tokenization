@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from torch.optim import AdamW
 from tqdm import tqdm
 import math
+import json
+
 
 from src.config import config
 from src.data.load_tinystories import load_tinystories
@@ -19,23 +21,30 @@ def get_lr(step, warmup_steps, total_steps):
             return config["learning_rate"] * (step + 1) / warmup_steps
         
         progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        progress = min(1.0, progress)
         return config["learning_rate"] * 0.5 * (1.0 + math.cos(math.pi * progress))
+
+
 
 def train_model(tokenizer_name: str, model_type: str):
     print(f"Starting training with tokenizer='{tokenizer_name}', model_type='{model_type}'")
     device = config["device"]
 
-    # 1) tokenizer and data
+    # 1) tokenizer and dataset
     tokenizer = get_tokenizer(tokenizer_name)
-    print("Loading Wiki2...")
-    train_ds, val_ds, test_ds = load_wiki2()
-    print("Loaded Wiki2:", len(train_ds), "train,", len(val_ds), "val", (test_ds), "test")
+    pad_id = tokenizer.pad_id
 
-    print("Building tokenized datasets and dataloaders...")
-    train_loader, val_loader= make_dataloaders(train_ds, val_ds, tokenizer, config)
+    print("Loading Wiki2...")
+    train_raw, val_raw, test_raw = load_wiki2()
+    print("Loaded Wiki2:", len(train_raw), "train,", len(val_raw), "val,", len(test_raw), "test")
+
+
+
+    train_texts = [ex["text"] for ex in train_raw]
+    val_texts   = [ex["text"] for ex in val_raw]
+
+    train_loader, val_loader, train_ds, val_ds = make_dataloaders(train_raw, val_raw, tokenizer, config)
     print("Dataloaders ready. Starting epochs...")
-    # train_ds, val_ds = load_tinystories()
-    # train_loader, val_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
 
     total_steps = config["num_epochs"] * len(train_loader)
     warmup_steps = int(0.05 * total_steps)
@@ -60,10 +69,15 @@ def train_model(tokenizer_name: str, model_type: str):
     model = model.to(device)
     optimizer = AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=0.01)
 
-    # 3) training loop
+    # results folder
+    os.makedirs("results", exist_ok=True)
+    results = []
+
     global_step = 0
+
+    # 3) training loop
     for epoch in range(config["num_epochs"]):
-        print(f"Epoch {epoch} starting...")
+        print(f"\n===== Epoch {epoch} =====")
         model.train()
         total_loss = 0.0
 
@@ -78,7 +92,8 @@ def train_model(tokenizer_name: str, model_type: str):
             loss = F.cross_entropy(
                 logits.view(-1, vocab_size),
                 y.view(-1),
-                label_smoothing=0.1,
+                ignore_index=pad_id,
+                label_smoothing=config.get("label_smoothing", 0.0),
             )
 
             optimizer.zero_grad()
@@ -89,15 +104,79 @@ def train_model(tokenizer_name: str, model_type: str):
             total_loss += loss.item()
             global_step += 1
 
-        avg_loss = total_loss / len(train_loader)
-        print(f"Epoch {epoch}: train_loss={avg_loss:.4f}")
+        train_loss = total_loss / len(train_loader)
 
+        # ---- validation ----
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for x, y in val_loader:
+                x, y = x.to(device), y.to(device)
+                logits = model(x)
+                vloss = F.cross_entropy(
+                    logits.view(-1, vocab_size),
+                    y.view(-1),
+                    ignore_index=pad_id)
+                val_loss += vloss.item()
+
+        val_loss /= len(val_loader)
+
+        # ---- compute metrics ----
+        # 1. nll per token
+        nll_token = val_loss                        # in nats
+
+        # 2. perplexity
+        ppl = math.exp(nll_token)
+
+        # 3. bits per token
+        bits_per_token = nll_token / math.log(2)
+
+        # character counts for val set
+        total_chars = sum(len(t) for t in val_texts)
+
+        # total tokens in validation pass
+        # total_tokens = len(val_loader) * config["batch_size"] * config["context_length"]
+        total_tokens = len(val_ds.ids)
+
+        tokens_per_char = total_tokens / total_chars
+
+        # 4. nll per char
+        nll_per_char = (nll_token * total_tokens) / total_chars
+
+        # 5. bits per char
+        bpc = nll_per_char / math.log(2)
+
+        # ---- print metrics ----
+        print(f"Epoch {epoch}:")
+        print(f"  nll/token       = {nll_token:.4f} nats")
+        print(f"  perplexity      = {ppl:.4f}")
+        print(f"  bits per token  = {bits_per_token:.4f}")
+        print(f"  nll/char        = {nll_per_char:.4f} nats")
+        print(f"  bits per char   = {bpc:.4f} bits")
+        print(f"  tokens per char = {tokens_per_char:.4f}")
+
+        # ---- save JSON metrics ----
+        results.append({
+            "epoch": epoch,
+            "nll_token": nll_token,
+            "perplexity": ppl,
+            "bits_per_token": bits_per_token,
+            "nll_per_char": nll_per_char,
+            "bits_per_char": bpc,
+            "tokens_per_char": tokens_per_char,
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+            "lr": lr,
+        })
+
+        with open(f"results/metrics_{tokenizer_name}_{model_type}.json", "w") as f:
+            json.dump(results, f, indent=2)
+
+        # ---- save checkpoint ----
         os.makedirs("checkpoints", exist_ok=True)
-        # (optional) save checkpoint
-        out_path = f"checkpoints/{tokenizer_name}_{model_type}_epoch{epoch}.pt"
-        torch.save(model.state_dict(), out_path)
-        print(f"Saved checkpoint to {out_path}")
-
+        ckpt_path = f"checkpoints/{tokenizer_name}_{model_type}_epoch{epoch}.pt"
+        torch.save(model.state_dict(), ckpt_path)
+        print(f"Saved checkpoint to {ckpt_path}")
 
 if __name__ == "__main__":
     # Expect: python -m src.training.train word transformer
