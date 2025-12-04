@@ -14,3 +14,4 @@ pandas>=2.3
 PyYAML>=6.0
 # typer-slim>=0.20.0   # keep if you use Typer CLI
 # hf-xet>=1.2.0        # keep if needed
+matplotlib==3.9.0
