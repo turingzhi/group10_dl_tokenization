@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class LSTMLM(nn.Module):
-    def __init__(self, vocab_size, model_dim):
+    def __init__(self, vocab_size, model_dim, dropout=0.0):
         super().__init__()
         self.embed = nn.Embedding(vocab_size, model_dim)
         self.lstm = nn.LSTM(model_dim, model_dim, batch_first=True)

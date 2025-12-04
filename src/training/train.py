@@ -22,7 +22,10 @@ def get_lr(step, warmup_steps, total_steps):
         progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
         return config["learning_rate"] * 0.5 * (1.0 + math.cos(math.pi * progress))
 
-def train_model(tokenizer_name: str, model_type: str):
+def train_model(tokenizer_name: str, model_type: str, cfg_overrides=None):
+    if cfg_overrides:
+        config.update(cfg_overrides)
+        print("new config")
     print(f"Starting training with tokenizer='{tokenizer_name}', model_type='{model_type}'")
     device = config["device"]
 
@@ -70,6 +73,9 @@ def train_model(tokenizer_name: str, model_type: str):
     model = model.to(device)
     optimizer = AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=0.01)
 
+    # results folder
+    os.makedirs("results", exist_ok=True)
+    results = []
     # 3) training loop
     global_step = 0
     for epoch in range(config["num_epochs"]):
@@ -103,9 +109,7 @@ def train_model(tokenizer_name: str, model_type: str):
         train_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch}: train_loss={train_loss:.4f}")
 
-         # results folder
-        os.makedirs("results", exist_ok=True)
-        results = []
+       
         # ---- validation ----
         model.eval()
         val_loss = 0.0

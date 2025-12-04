@@ -7,16 +7,16 @@ We compare **Word**, **BPE**, **Unigram**, and **Byte-level** tokenizers on the 
 
 ---
 
-Clone the repository:
+## **1. Setup**
+
+### **Clone the repository**
 
 ```bash
 git clone https://github.com/turingzhi/group10_dl_tokenization.git
 cd group10_dl_tokenization
 ```
 
-
-
-Init the environment:
+**Create the Conda environment**
 
 ```bash
 conda create -n token python=3.10
@@ -24,15 +24,15 @@ conda activate token
 pip install -r requirements.txt
 ```
 
-Build the corpus
+## **2. Data Preparation**
+
+**Build the corpus**
 
 ```bash
 python -m src.tokenization.build_corpus
 ```
 
-
-
-Build the tokenization
+**Train tokenizers**
 
 ```bash
 python -m src.tokenization.train_word
@@ -41,12 +41,9 @@ python -m src.tokenization.train_unigram
 
 ```
 
+## **3. Training (Command Line)**
 
-
-
-
-
-Then train the models with different tokenizers
+**Transformer models**
 
 
 ```bash
@@ -62,53 +59,46 @@ python -m src.training.train unigram lstm
 python -m src.training.train byte lstm
 ```
 
+## **4. Training (Jupyter Notebook)**
 
-
-
-
-
-The results look like:
-
-checkpoints/<tokenizer>_<model_type>_epochX.pt
-
-Example: checkpoints/word_transformer_epoch4.pt
-
-
-
-Evaluate the results validation set:
-
+**Register a notebook kernel**
 
 ```bash
-python -m src.evaluation.eval_model word transformer checkpoints/word_transformer_epoch4.pt val
-python -m src.evaluation.eval_model bpe transformer checkpoints/bpe_transformer_epoch4.pt val
-python -m src.evaluation.eval_model unigram transformer checkpoints/unigram_transformer_epoch4.pt val
-python -m src.evaluation.eval_model byte transformer checkpoints/byte_transformer_epoch4.pt val
- 
-python -m src.evaluation.eval_model word lstm checkpoints/word_lstm_epoch4.pt val
-python -m src.evaluation.eval_model bpe lstm checkpoints/bpe_lstm_epoch4.pt val
-python -m src.evaluation.eval_model unigram lstm checkpoints/unigram_lstm_epoch4.pt val
-python -m src.evaluation.eval_model byte lstm checkpoints/byte_lstm_epoch4.pt val
+python -m ipykernel install --user --name token --display-name "Python (token)"
 ```
 
-Evaluate the results testset:
-
+**Start a remote Jupyter server**
 
 ```bash
-python -m src.evaluation.eval_model word transformer checkpoints/word_transformer_epoch4.pt test
-python -m src.evaluation.eval_model bpe transformer checkpoints/bpe_transformer_epoch4.pt test
-python -m src.evaluation.eval_model unigram transformer checkpoints/unigram_transformer_epoch4.pt test
-python -m src.evaluation.eval_model byte transformer checkpoints/byte_transformer_epoch4.pt test
- 
-python -m src.evaluation.eval_model word lstm checkpoints/word_lstm_epoch4.pt test
-python -m src.evaluation.eval_model bpe lstm checkpoints/bpe_lstm_epoch4.pt test
-python -m src.evaluation.eval_model unigram lstm checkpoints/unigram_lstm_epoch4.pt test
-python -m src.evaluation.eval_model byte lstm checkpoints/byte_lstm_epoch4.pt test
+jupyter notebook \
+  --no-browser \
+  --port=8890 \
+  --ip=n-62-12-19 \
+  --ServerApp.token='' \
+  --ServerApp.password=''
 ```
 
+Now open notebook, select kernel from top right corner and select `another kernel` and `existing jupyter server`
+
+Then input `http://n-62-12-19:8890` and press `enter` to get access to the server
+
+### **Connect from notebook / VS Code**
+
+1. Open Jupyter Notebook or VS Code
+2. Select **Existing Jupyter Server** from **select kernel** from top right corner
+3. Enter: `http://n-62-12-19:8890`
+4. Select kernel: `Python (token)`
+
+Now you can run all model training inside the notebook environment.
 
 
 
+## **5. Output**
+
+- Tokenizer files → data/
+- Metrics (loss, perplexity, etc.) → results/
+- Model checkpoints → checkpoints/
 
 
 
-
+------
