@@ -26,6 +26,7 @@ def train_model(tokenizer_name: str, model_type: str, cfg_overrides=None):
     if cfg_overrides:
         config.update(cfg_overrides)
         print("new config")
+
     print(f"Starting training with tokenizer='{tokenizer_name}', model_type='{model_type}'")
     device = config["device"]
 
@@ -36,19 +37,16 @@ def train_model(tokenizer_name: str, model_type: str, cfg_overrides=None):
 
     print("Loading Wiki2...")
     train_raw, val_raw, test_raw = load_wiki2()
-    print("Loaded Wiki2:", len(train_raw), "train,", len(val_raw), "val", (test_raw), "test")
+    print("Loaded Wiki2:", len(train_raw), "train,", len(val_raw), "val", len(test_raw), "test")
 
     train_texts = [ex["text"] for ex in train_raw]
     val_texts   = [ex["text"] for ex in val_raw]
+    test_texts  = [ex["text"] for ex in test_raw]
 
     print("Building tokenized datasets and dataloaders...")
-    train_loader, val_loader, train_ds, val_ds = make_dataloaders(train_raw, val_raw, tokenizer, config)
+    # NOTE: make_dataloaders must now also build test_loader, test_ds
+    train_loader, val_loader, test_loader, train_ds, val_ds, test_ds = make_dataloaders(train_raw, val_raw, test_raw, tokenizer, config)
     print("Dataloaders ready. Starting epochs...")
-
-    # train_loader, val_loader= make_dataloaders(train_ds, val_ds, tokenizer, config)
-    # print("Dataloaders ready. Starting epochs...")
-    # train_ds, val_ds = load_tinystories()
-    # train_loader, val_loader = make_dataloaders(train_ds, val_ds, tokenizer, config)
 
     total_steps = config["num_epochs"] * len(train_loader)
     warmup_steps = int(0.05 * total_steps)
@@ -73,11 +71,13 @@ def train_model(tokenizer_name: str, model_type: str, cfg_overrides=None):
     model = model.to(device)
     optimizer = AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=0.01)
 
-    # results folder
     os.makedirs("results", exist_ok=True)
+    os.makedirs("checkpoints", exist_ok=True)
+
     results = []
-    # 3) training loop
     global_step = 0
+
+    # 3) training loop
     for epoch in range(config["num_epochs"]):
         print(f"Epoch {epoch} starting...")
         model.train()
@@ -89,7 +89,6 @@ def train_model(tokenizer_name: str, model_type: str, cfg_overrides=None):
                 g["lr"] = lr
 
             x, y = x.to(device), y.to(device)
-
             logits = model(x)
             loss = F.cross_entropy(
                 logits.view(-1, vocab_size),
@@ -109,7 +108,6 @@ def train_model(tokenizer_name: str, model_type: str, cfg_overrides=None):
         train_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch}: train_loss={train_loss:.4f}")
 
-       
         # ---- validation ----
         model.eval()
         val_loss = 0.0
@@ -120,54 +118,48 @@ def train_model(tokenizer_name: str, model_type: str, cfg_overrides=None):
                 vloss = F.cross_entropy(
                     logits.view(-1, vocab_size),
                     y.view(-1),
-                    ignore_index=pad_id)
+                    ignore_index=pad_id
+                )
                 val_loss += vloss.item()
 
         val_loss /= len(val_loader)
 
-        # ---- compute metrics ----
-        # 1. nll per token
-        nll_token = val_loss                        # in nats
-
-        # 2. perplexity
+        # ---- compute val metrics ----
+        nll_token = val_loss
         ppl = math.exp(nll_token)
-
-        # 3. bits per token
         bits_per_token = nll_token / math.log(2)
 
-        # character counts for val set
-        total_chars = sum(len(t) for t in val_texts)
+        total_chars_val = sum(len(t) for t in val_texts)
+        total_tokens_val = len(val_ds.ids)
+        tokens_per_char = total_tokens_val / total_chars_val
 
-        # total tokens in validation pass
-        # total_tokens = len(val_loader) * config["batch_size"] * config["context_length"]
-        total_tokens = len(val_ds.ids)
-
-        tokens_per_char = total_tokens / total_chars
-
-        # 4. nll per char
-        nll_per_char = (nll_token * total_tokens) / total_chars
-
-        # 5. bits per char
+        nll_per_char = (nll_token * total_tokens_val) / total_chars_val
         bpc = nll_per_char / math.log(2)
 
-        # ---- print metrics ----
-        print(f"Epoch {epoch}:")
-        print(f"  nll/token       = {nll_token:.4f} nats")
-        print(f"  perplexity      = {ppl:.4f}")
-        print(f"  bits per token  = {bits_per_token:.4f}")
-        print(f"  nll/char        = {nll_per_char:.4f} nats")
-        print(f"  bits per char   = {bpc:.4f} bits")
-        print(f"  tokens per char = {tokens_per_char:.4f}")
+        total_bytes_val = sum(len(t.encode("utf-8")) for t in val_texts)
+        total_nll_val = nll_token * total_tokens_val          
+        nll_per_byte = total_nll_val / total_bytes_val        
+        bits_per_byte = nll_per_byte / math.log(2.0)
 
-           # ---- save JSON metrics ----
+        print(f"Epoch {epoch}:")
+        print(f"  [VAL] nll/token       = {nll_token:.4f} nats")
+        print(f"  [VAL] perplexity      = {ppl:.4f}")
+        print(f"  [VAL] bits per token  = {bits_per_token:.4f}")
+        print(f"  [VAL] nll/char        = {nll_per_char:.4f} nats")
+        print(f"  [VAL] bits per char   = {bpc:.4f} bits")
+        print(f"  [VAL] tokens per char = {tokens_per_char:.4f}")
+        print(f"  [VAL] bits per byte   = {bits_per_byte:.4f}")
+
         results.append({
             "epoch": epoch,
+            "split": "val",
             "nll_token": nll_token,
             "perplexity": ppl,
             "bits_per_token": bits_per_token,
             "nll_per_char": nll_per_char,
             "bits_per_char": bpc,
             "tokens_per_char": tokens_per_char,
+            "bits_per_byte": bits_per_byte,
             "train_loss": train_loss,
             "val_loss": val_loss,
             "lr": lr,
@@ -176,12 +168,65 @@ def train_model(tokenizer_name: str, model_type: str, cfg_overrides=None):
         with open(f"results/metrics_{tokenizer_name}_{model_type}.json", "w") as f:
             json.dump(results, f, indent=2)
 
-
-        os.makedirs("checkpoints", exist_ok=True)
-        # (optional) save checkpoint
         out_path = f"checkpoints/{tokenizer_name}_{model_type}_epoch{epoch}.pt"
         torch.save(model.state_dict(), out_path)
         print(f"Saved checkpoint to {out_path}")
+
+    # compute test metrics
+    print("Evaluating on TEST set with final model...")
+    model.eval()
+    test_loss = 0.0
+    with torch.no_grad():
+        for x, y in test_loader:
+            x, y = x.to(device), y.to(device)
+            logits = model(x)
+            tloss = F.cross_entropy(
+                logits.view(-1, vocab_size),
+                y.view(-1),
+                ignore_index=pad_id
+            )
+            test_loss += tloss.item()
+
+    test_loss /= len(test_loader)
+
+    # compute test metrics
+    nll_token = test_loss
+    ppl = math.exp(nll_token)
+    bits_per_token = nll_token / math.log(2)
+
+    total_chars_test = sum(len(t) for t in test_texts)
+    total_tokens_test = len(test_ds.ids)
+    tokens_per_char = total_tokens_test / total_chars_test
+
+    nll_per_char = (nll_token * total_tokens_test) / total_chars_test
+    bpc = nll_per_char / math.log(2)
+
+    total_bytes_test = sum(len(t.encode("utf-8")) for t in test_texts)
+    total_nll_test = nll_token * total_tokens_test        
+    nll_per_byte = total_nll_test / total_bytes_test
+    bits_per_byte = nll_per_byte / math.log(2.0)
+
+    print("TEST metrics:")
+    print(f"  [TEST] nll/token       = {nll_token:.4f} nats")
+    print(f"  [TEST] perplexity      = {ppl:.4f}")
+    print(f"  [TEST] bits per token  = {bits_per_token:.4f}")
+    print(f"  [TEST] nll/char        = {nll_per_char:.4f} nats")
+    print(f"  [TEST] bits per char   = {bpc:.4f} bits")
+    print(f"  [TEST] tokens per char = {tokens_per_char:.4f}")
+    print(f"  [TEST] bits per byte   = {bits_per_byte:.4f}")
+
+    test_results = {
+        "split": "test",
+        "nll_token": nll_token,
+        "perplexity": ppl,
+        "bits_per_token": bits_per_token,
+        "nll_per_char": nll_per_char,
+        "bits_per_char": bpc,
+        "tokens_per_char": tokens_per_char,
+        "bits_per_byte": bits_per_byte,
+    }
+    with open(f"results/test_metrics_{tokenizer_name}_{model_type}.json", "w") as f:
+        json.dump(test_results, f, indent=2)
 
 
 
