@@ -1,0 +1,10 @@
+{
+  "split": "test",
+  "nll_token": 4.7202967639909374,
+  "perplexity": 112.20154510588145,
+  "bits_per_token": 6.809948732933948,
+  "nll_per_char": 1.4052152024455333,
+  "bits_per_char": 2.027297003949952,
+  "tokens_per_char": 0.2976963679837464,
+  "bits_per_byte": 2.024094656346217
+}

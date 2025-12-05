@@ -37,7 +37,7 @@ def train_model(tokenizer_name: str, model_type: str, cfg_overrides=None):
 
     print("Loading Wiki2...")
     train_raw, val_raw, test_raw = load_wiki2()
-    print("Loaded Wiki2:", len(train_raw), "train,", len(val_raw), "val", len(test_raw), "test")
+    # print("Loaded Wiki2:", len(train_raw), "train,", len(val_raw), "val", len(test_raw), "test")
 
     train_texts = [ex["text"] for ex in train_raw]
     val_texts   = [ex["text"] for ex in val_raw]
